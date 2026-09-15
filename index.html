@@ -449,7 +449,7 @@ footer .foot-bottom{margin-top:30px;padding-top:18px;border-top:1px solid rgba(2
     <p style="max-width:34ch;margin-top:14px;opacity:.85;font-weight:600">Tu nuevo lugar feliz en Ibagué. Crepas, waffles, pancakes y heladería artesanal.</p>
   </div>
   <div class="col"><b>Menú</b><a data-page="menu">Ver menú</a><a data-page="carrito">Mi carrito</a><a data-page="tarjeta">Mi tarjeta</a><a href="admin.html">Panel del negocio</a></div>
-  <div class="col"><b>Contacto</b><a id="waFoot" target="_blank" rel="noopener">WhatsApp: 315 529 9927</a>
+  <div class="col"><b>Contacto</b><a id="waFoot" target="_blank" rel="noopener">WhatsApp: 315 929 9927</a>
     <a href="https://instagram.com/crepa.ibague" target="_blank" rel="noopener">@crepa.ibague</a><p>Ibagué, Tolima</p></div>
   <div class="col"><b>Horario</b><p>Lun–Jue: 3:30pm – 9:00pm</p><p>Vie–Dom: 3:00pm – 9:30pm</p></div>
 </div>
@@ -568,7 +568,7 @@ const SEED_PRODUCTS = [
 
 /* ===== STORE compartido con admin.html ===== */
 const K={p:'crepa_products',c:'crepa_clients',o:'crepa_orders',g:'crepa_config',cs:'crepa_client_session'};
-const DEF_CFG={stamps:8,reward:'Un producto de regalo (por definir)',wa:'573155299927'};
+const DEF_CFG={stamps:8,reward:'Un producto de regalo (por definir)',wa:'573159299927'};
 function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 const SEED_VERSION=3;               // súbelo cuando cambies el catálogo del código
@@ -580,7 +580,7 @@ if(!PRODUCTS||_sv<SEED_VERSION){
   save(K.p,PRODUCTS); try{localStorage.setItem('crepa_seed_v',SEED_VERSION)}catch(e){}
 }
 let CFG={...DEF_CFG,...load(K.g,{})};
-const WA=CFG.wa||'573155299927';
+const WA=CFG.wa||'573159299927';
 document.getElementById('waDirect').href='https://wa.me/'+WA;
 document.getElementById('waFoot').href='https://wa.me/'+WA;
 

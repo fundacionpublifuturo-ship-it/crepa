@@ -314,7 +314,7 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
         <h2>Fidelización</h2><p class="psub">Define cuántas compras se necesitan y cuál es el premio.</p>
         <div class="field"><label>Compras necesarias para el premio</label><input id="cfgStamps" type="number" min="1" max="12"></div>
         <div class="field"><label>Descripción del premio</label><input id="cfgReward" placeholder="Ej: Un bowl de oblea gratis"></div>
-        <div class="field"><label>WhatsApp de pedidos</label><input id="cfgWa" placeholder="573155299927"><div class="hint">Solo números, con indicativo del país.</div></div>
+        <div class="field"><label>WhatsApp de pedidos</label><input id="cfgWa" placeholder="573159299927"><div class="hint">Solo números, con indicativo del país.</div></div>
         <button class="btn btn-dark" onclick="saveCfg()">Guardar cambios</button>
       </div>
       <div class="panel" style="max-width:520px">
@@ -354,7 +354,7 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
 <div class="modal" id="mCli"><div class="mbox">
   <h2 id="mcTitle">Crear cliente</h2><p class="msub">Nombre y teléfono son obligatorios. El teléfono será su usuario y clave.</p>
   <div class="field"><label>Nombre completo <span class="req">*</span></label><input id="fcName" placeholder="Ej: María Fernanda López"></div>
-  <div class="field"><label>Número de teléfono <span class="req">*</span></label><input id="fcPhone" inputmode="numeric" placeholder="3155299927">
+  <div class="field"><label>Número de teléfono <span class="req">*</span></label><input id="fcPhone" inputmode="numeric" placeholder="3159299927">
     <div class="hint">Con este número el cliente entra a ver su tarjeta.</div></div>
   <div class="mrow">
     <div class="field"><label>Cédula</label><input id="fcId" inputmode="numeric" placeholder="Opcional"></div>
@@ -486,7 +486,7 @@ const SEED_PRODUCTS = [
 
 /* ===== STORE (localStorage) ===== */
 const K={p:'crepa_products',c:'crepa_clients',o:'crepa_orders',g:'crepa_config',s:'crepa_session'};
-const DEF_CFG={stamps:8,reward:'Un producto de regalo (por definir)',wa:'573155299927'};
+const DEF_CFG={stamps:8,reward:'Un producto de regalo (por definir)',wa:'573159299927'};
 function load(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('No se pudo guardar')}}
 let PRODUCTS=load(K.p,null), CLIENTS=load(K.c,[]), ORDERS=load(K.o,[]), CFG=load(K.g,DEF_CFG);
