@@ -593,8 +593,12 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 
 /* ===== CART ===== */
 const cart={};
+let paraLlevar=false;
+const RECARGO_LLEVAR=2000;
 const cartCount=()=>Object.values(cart).reduce((s,i)=>s+i.qty,0);
-const cartTotal=()=>Object.values(cart).reduce((s,i)=>s+i.qty*i.p.price,0);
+const cartSubtotal=()=>Object.values(cart).reduce((s,i)=>s+i.qty*i.p.price,0);
+const llevarTotal=()=>paraLlevar?cartCount()*RECARGO_LLEVAR:0;
+const cartTotal=()=>cartSubtotal()+llevarTotal();
 function addToCart(p){if(!cart[p.id])cart[p.id]={p,qty:0};cart[p.id].qty++;sync();}
 function setQty(id,q){if(!cart[id])return;cart[id].qty=Math.max(0,q);if(!cart[id].qty)delete cart[id];sync();}
 function sync(){
@@ -670,10 +674,24 @@ function renderCart(){
       <div class="cd"><h3>${esc(i.p.name)}</h3><div class="up">${money(i.p.price)} c/u</div>
         <div class="stepper" data-sp="${i.p.id}" style="margin-top:8px"><button data-act="dec">−</button><span>${i.qty}</span><button data-act="inc">+</button></div></div>
       <div class="rt"><div class="lp">${money(i.qty*i.p.price)}</div><button class="rm" data-rm="${i.p.id}">Quitar</button></div></div>`).join('')}</div>
-    <div class="summary"><div class="ln"><span>Productos (${cartCount()})</span><span>${money(cartTotal())}</span></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 0 10px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:800;color:var(--espresso);font-size:.95rem;flex:1">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:28px;border-radius:100px;
+          background:${paraLlevar?'var(--gold)':'var(--line)'};transition:.2s;position:relative">
+          <span style="width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;left:${paraLlevar?'22px':'3px'};
+            transition:.2s;box-shadow:0 2px 6px rgba(0,0,0,.18)"></span>
+        </span>
+        Para llevar (+$2.000 c/u)
+      </label>
+      <button class="btn btn-line btn-sm" id="toggleLlevar" style="display:none"></button>
+    </div>
+    <div class="summary"><div class="ln"><span>Productos (${cartCount()})</span><span>${money(cartSubtotal())}</span></div>
+      ${paraLlevar?'<div class="ln"><span>Para llevar ('+cartCount()+' × $2.000)</span><span>'+money(llevarTotal())+'</span></div>':''}
       <div class="ln"><span>Domicilio</span><span>Se coordina por WhatsApp</span></div>
       <div class="tot"><span>Total</span><span>${money(cartTotal())}</span></div></div>
     <button class="btn btn-gold btn-full" data-page="checkout">Continuar →</button>`;
+  // Toggle para llevar
+  a.querySelector('label').onclick=()=>{paraLlevar=!paraLlevar;renderCart();sync();};
   attachSteppers(a);
   a.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>setQty(b.dataset.rm,0));
   bindPages();
@@ -697,6 +715,7 @@ function renderCheckout(){
     <div class="field"><label>Método de pago</label><div class="pays" id="pays">${
       pays.map(p=>`<button class="pay${p[0]===payMethod?' on':''}" data-pay="${p[0]}">${p[0]}<small>${p[1]}</small></button>`).join('')}</div></div>
     <div class="summary">${Object.values(cart).map(i=>`<div class="ln"><span>${i.qty}× ${esc(i.p.name)}</span><span>${money(i.qty*i.p.price)}</span></div>`).join('')}
+      ${paraLlevar?`<div class="ln" style="color:var(--gold-deep)"><span>Para llevar (${cartCount()} × $2.000)</span><span>${money(llevarTotal())}</span></div>`:''}
       <div class="tot"><span>Total</span><span>${money(cartTotal())}</span></div></div>
     <button class="btn btn-dark btn-full" id="genBtn" style="margin-bottom:12px">
       🧾 Generar comprobante y continuar</button>
@@ -722,7 +741,7 @@ function generateReceipt(){
 
   const W=720, pad=44, rowH=58;
   const infoLines=(name?1:0)+(tel?1:0)+(dir?1:0);
-  const H=252+infoLines*26+items.length*rowH+272;
+  const H=252+infoLines*26+items.length*rowH+272+(paraLlevar?32:0);
   const cv=document.getElementById('rcptCanvas');
   cv.width=W;cv.height=H;
   const c=cv.getContext('2d');
@@ -787,6 +806,13 @@ function generateReceipt(){
     c.strokeStyle='#ecdcc2';c.lineWidth=2;c.beginPath();c.moveTo(pad,y);c.lineTo(W-pad,y);c.stroke();
     y+=44;
     // total block
+    if(paraLlevar){
+      c.fillStyle='#9A6A2C';c.font='700 17px Arial';
+      c.fillText('Para llevar ('+items.reduce((s,i)=>s+i.qty,0)+' × $2.000)',pad,y);
+      c.fillStyle='#9A6A2C';c.font='700 17px Georgia, serif';c.textAlign='right';
+      c.fillText('$'+llevarTotal().toLocaleString('es-CO'),W-pad,y);c.textAlign='left';
+      y+=32;
+    }
     c.fillStyle='#241811';drawRoundRect(c,pad,y-34,W-pad*2,64,18);c.fill();
     c.fillStyle='#E7C8A0';c.font='800 19px Arial';c.fillText('TOTAL',pad+24,y+6);
     c.fillStyle='#B8823A';c.font='700 32px Georgia, serif';c.textAlign='right';
@@ -818,6 +844,7 @@ function finishReceipt(dataURL,info){
 
   let msg='¡Hola Crepa! 🍓 Quiero hacer este pedido:\n\n';
   info.items.forEach(i=>{msg+=`• ${i.qty}× ${i.p.name} — $${(i.qty*i.p.price).toLocaleString('es-CO')}\n`;});
+  if(paraLlevar) msg+=`\nPara llevar: +$${llevarTotal().toLocaleString('es-CO')}\n`;
   msg+=`\n*Total: $${info.total.toLocaleString('es-CO')}*\nPago: ${info.pay}\nPedido: ${info.orderNo}\n`;
   if(info.name)msg+=`Nombre: ${info.name}\n`;
   if(info.dir)msg+=`Entrega: ${info.dir}\n`;
