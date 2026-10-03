@@ -942,7 +942,15 @@ function saveCat(){
   }
   saveCats();
   if(DB.online) supa.from('categories').upsert(CATEGORIES.map(c=>({id:c.id,name:c.name,ord:c.ord}))).catch(e=>console.warn(e));
-  closeM('mCat2'); renderCats();
+  closeM('mCat2');
+  // Si el modal de producto está abierto, refrescar el select y seleccionar la nueva categoría
+  const prodModal=document.getElementById('mProd');
+  if(prodModal&&prodModal.classList.contains('on')){
+    const sel=document.getElementById('fpCat');
+    sel.innerHTML=catOptions(name);
+    sel.value=name;
+  }
+  renderCats();
 }
 function delCat(id){
   const c=CATEGORIES.find(x=>x.id===id); if(!c)return;
@@ -1000,7 +1008,8 @@ function exportCSV(which){
 
 /* ===== MODAL HELPERS ===== */
 function openM(id){document.getElementById(id).classList.add('on');document.body.style.overflow='hidden';}
-function closeM(id){document.getElementById(id).classList.remove('on');document.body.style.overflow='';}
+function closeM(id){document.getElementById(id).classList.remove('on');
+  if(!document.querySelector('.modal.on'))document.body.style.overflow='';}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeM(m.id);}));
 addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal.on').forEach(m=>closeM(m.id));});
 
