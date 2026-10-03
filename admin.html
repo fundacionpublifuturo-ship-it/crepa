@@ -284,6 +284,18 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
       <div id="pTable"></div>
     </section>
 
+
+    <!-- CATEGORÍAS -->
+    <section class="sec" data-sec="cats">
+      <div class="phead"><h1>Categorías</h1><p>Crea, renombra y reordena las categorías del menú.</p></div>
+      <div class="toolbar">
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="catSearch" placeholder="Buscar categoría…"></div>
+        <button class="btn btn-gold" onclick="openCatModal()">+ Nueva categoría</button>
+      </div>
+      <div id="catTable"></div>
+    </section>
+
     <!-- CLIENTES -->
     <section class="sec" data-sec="cli">
       <div class="phead"><h1>Clientes</h1><p>Base de datos de clientes y sus tarjetas de fidelización.</p></div>
@@ -337,7 +349,7 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
   <div class="field"><label>Descripción</label><textarea id="fpDesc" placeholder="Ingredientes o detalle del producto"></textarea></div>
   <div class="mrow">
     <div class="field"><label>Precio (COP)</label><input id="fpPrice" type="number" min="0" step="500" placeholder="18000"><div class="hint">Deja 0 si aún no lo defines.</div></div>
-    <div class="field"><label>Categoría <span class="req">*</span></label><input id="fpCat" list="catList" placeholder="Bowls"><datalist id="catList"></datalist></div>
+    <div class="field"><label>Categoría <span class="req">*</span></label><select id="fpCat" style="width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:#fff;font-weight:600"></select></div>
   </div>
   <div class="mrow">
     <div class="field"><label>Etiqueta especial</label><select id="fpTag">
@@ -345,8 +357,17 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
       <option value="temporada">Temporada</option><option value="favorito">Favorito</option></select></div>
     <div class="field"><label>Estado</label><select id="fpActive"><option value="1">Visible en el menú</option><option value="0">Oculto</option></select></div>
   </div>
-  <div class="field"><label>Imagen</label><input id="fpImg" placeholder="ID de Google Drive o URL completa">
-    <div class="hint">Pega el ID del archivo de Drive (recomendado) o una URL de imagen.</div></div>
+  <div class="field"><label>Imagen del producto</label>
+    <div id="fpPreview" style="display:none;margin-bottom:10px;text-align:center">
+      <img id="fpPrevImg" style="max-height:160px;border-radius:14px;margin:0 auto"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <label class="btn btn-gold btn-sm" style="cursor:pointer;flex:1;justify-content:center">📷 Subir foto
+        <input type="file" id="fpFile" accept="image/*" onchange="previewImg(this)" hidden></label>
+      <input id="fpImg" style="flex:2;min-width:140px" placeholder="O pega ID de Drive / URL">
+    </div>
+    <div class="hint">Sube una foto (se guarda en Supabase Storage) o pega el ID de Drive.</div>
+    <div id="fpUploadStatus" style="display:none;margin-top:6px;font-weight:700;font-size:.84rem;color:var(--gold-deep)"></div>
+  </div>
   <div class="mfoot"><button class="btn btn-line" onclick="closeM('mProd')">Cancelar</button>
     <button class="btn btn-gold" onclick="saveProd()">Guardar</button></div>
 </div></div>
@@ -365,6 +386,12 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
     <button class="btn btn-gold" onclick="saveCli()">Guardar cliente</button></div>
 </div></div>
 
+<div class="modal" id="mCat2"><div class="mbox">
+  <h2 id="mctTitle">Nueva categoría</h2><p class="msub">El nombre aparece en el menú y en los filtros.</p>
+  <div class="field"><label>Nombre <span class="req">*</span></label><input id="fctName" placeholder="Ej: Bebidas calientes"></div>
+  <div class="mfoot"><button class="btn btn-line" onclick="closeM('mCat2')">Cancelar</button>
+    <button class="btn btn-gold" onclick="saveCat()">Guardar</button></div>
+</div></div>
 <div class="modal" id="mCard"><div class="mbox" id="cardBody"></div></div>
 
 <div id="toast"></div>
@@ -490,6 +517,15 @@ const DEF_CFG={stamps:8,reward:'Un producto de regalo (por definir)',wa:'5731592
 function load(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('No se pudo guardar')}}
 let PRODUCTS=load(K.p,null), CLIENTS=load(K.c,[]), ORDERS=load(K.o,[]), CFG=load(K.g,DEF_CFG);
+let CATEGORIES=load('crepa_cats',null);
+if(!CATEGORIES) CATEGORIES=[
+  {id:'bowls',name:'Bowls',ord:1},{id:'crepas-dulces',name:'Crepas dulces',ord:2},
+  {id:'crepas-saladas',name:'Crepas saladas',ord:3},{id:'waffles',name:'Waffles',ord:4},
+  {id:'gofres',name:'Gofres',ord:5},{id:'vasos-crema',name:'Vasos con crema',ord:6},
+  {id:'menu-infantil',name:'Menú infantil',ord:7},{id:'malteadas',name:'Malteadas',ord:8},
+  {id:'toppings',name:'Toppings',ord:9}];
+function saveCats(){save('crepa_cats',CATEGORIES);}
+let _pendingFile=null;
 const SEED_VERSION=3;
 const _sv=Number(localStorage.getItem('crepa_seed_v')||0);
 if(!PRODUCTS||_sv<SEED_VERSION){
@@ -532,7 +568,10 @@ async function bootstrap(){
   const badge=document.getElementById('dbState');
   if(!DB.online){ if(badge)badge.textContent='Modo local (sin Supabase)'; return; }
   try{
-    const [pr,cl,or_,cf]=await Promise.all([DB.getProducts(),DB.getClients(),DB.getOrders(),DB.getConfig()]);
+    const [pr,cl,or_,cf,cats]=await Promise.all([DB.getProducts(),DB.getClients(),DB.getOrders(),DB.getConfig(),
+      supa.from('categories').select('*').order('ord',{ascending:true}).then(r=>r.data).catch(()=>null)]);
+    if(cats&&cats.length){CATEGORIES=cats.map(c=>({id:c.id,name:c.name,ord:c.ord}));saveCats();}
+    else if(CATEGORIES.length){supa.from('categories').upsert(CATEGORIES.map(c=>({id:c.id,name:c.name,ord:c.ord}))).catch(e=>console.warn(e));}
     if(pr&&pr.length){PRODUCTS=pr;} else {await DB.upsertProducts(PRODUCTS);}   // primera vez: sube el catálogo
     CLIENTS=cl||[]; ORDERS=or_||[];
     if(cf)CFG={...DEF_CFG,...cf}; else await DB.saveConfig(CFG);
@@ -555,6 +594,7 @@ document.getElementById('lbtn').onclick=doLogin;
 const SECS=[
  {id:'dash',t:'Resumen',ic:'<path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6ZM13 9h8V3h-8v6Z"/>'},
  {id:'prod',t:'Productos',ic:'<path d="M20 7 12 3 4 7l8 4 8-4Zm0 0v10l-8 4-8-4V7"/><path d="m12 11 0 10"/>'},
+ {id:'cats',t:'Categorías',ic:'<path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/>'},
  {id:'cli',t:'Clientes',ic:'<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 11.2a3 3 0 1 0-1.5-5.6M18 20h3.5a5.5 5.5 0 0 0-4-5.3"/>'},
  {id:'ped',t:'Pedidos',ic:'<path d="M5 7h14l-1.2 12.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 7Z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>'},
  {id:'cfg',t:'Configuración',ic:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 15H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 8.5l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 4.6V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.5 1.5l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.6 1.6 0 0 0 21 11h.1a2 2 0 1 1 0 4H21Z"/>'},
@@ -570,7 +610,7 @@ function go(id){
   cur=id;
   document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.dataset.sec===id));
   document.querySelectorAll('[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
-  if(id==='dash')renderDash(); if(id==='prod')renderProd();
+  if(id==='dash')renderDash(); if(id==='prod')renderProd(); if(id==='cats')renderCats();
   if(id==='cli')renderCli(); if(id==='ped')renderOrd(); if(id==='cfg')fillCfg();
   const t=document.querySelector(`.chip[data-go="${id}"]`);
   if(t)t.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
@@ -608,7 +648,7 @@ function renderProd(){
   const cats=['Todos',...new Set(PRODUCTS.map(p=>p.cat))];
   document.getElementById('pCats').innerHTML=cats.map(c=>`<button class="chip${c===pFilter?' on':''}" data-pc="${esc(c)}">${esc(c)}</button>`).join('');
   document.querySelectorAll('[data-pc]').forEach(b=>b.onclick=()=>{pFilter=b.dataset.pc;renderProd();});
-  document.getElementById('catList').innerHTML=[...new Set(PRODUCTS.map(p=>p.cat))].map(c=>`<option value="${esc(c)}">`).join('');
+  
   let list=PRODUCTS.filter(p=>(pFilter==='Todos'||p.cat===pFilter)&&
     (!pQuery||p.name.toLowerCase().includes(pQuery)||p.cat.toLowerCase().includes(pQuery)));
   const el=document.getElementById('pTable');
@@ -635,24 +675,34 @@ function openProd(id){
   document.getElementById('fpName').value=editP?editP.name:'';
   document.getElementById('fpDesc').value=editP?editP.desc:'';
   document.getElementById('fpPrice').value=editP?editP.price:'';
-  document.getElementById('fpCat').value=editP?editP.cat:'';
+  document.getElementById('fpCat').innerHTML=catOptions(editP?editP.cat:'');
+  document.getElementById('fpCat').onchange=function(){if(this.value==='__new__'){this.value='';openCatModal();}};
+  document.getElementById('fpPreview').style.display='none';
+  document.getElementById('fpPrevImg').src='';
+  document.getElementById('fpUploadStatus').style.display='none';
+  _pendingFile=null;
+  if(editP&&editP.img){const u=imgUrl(editP.img);if(u){document.getElementById('fpPrevImg').src=u;document.getElementById('fpPreview').style.display='block';}}
+  document.getElementById('fpFile').value='';
   document.getElementById('fpTag').value=editP?(editP.tag||''):'';
   document.getElementById('fpActive').value=editP?(editP.active?'1':'0'):'1';
   document.getElementById('fpImg').value=editP?editP.img:'';
   openM('mProd');
 }
-function saveProd(){
+async function saveProd(){
   const name=document.getElementById('fpName').value.trim();
   const cat=document.getElementById('fpCat').value.trim();
-  if(!name||!cat){toast('Nombre y categoría son obligatorios');return;}
+  if(!name||!cat||cat==='__new__'){toast('Nombre y categoría son obligatorios');return;}
+  const pid=editP?editP.id:'x'+Date.now();
+  let imgVal=document.getElementById('fpImg').value.trim();
+  if(_pendingFile){const url=await uploadImage(_pendingFile,pid);if(url)imgVal=url;_pendingFile=null;}
   const o={name,cat,desc:document.getElementById('fpDesc').value.trim(),
     price:Number(document.getElementById('fpPrice').value)||0,
     tag:document.getElementById('fpTag').value,
     active:document.getElementById('fpActive').value==='1',
-    img:document.getElementById('fpImg').value.trim()};
+    img:imgVal};
   let target;
   if(editP){Object.assign(editP,o);target=editP;toast('Producto actualizado');}
-  else{target={id:'x'+Date.now(),...o};PRODUCTS.push(target);toast('Producto agregado');}
+  else{target={id:pid,...o};PRODUCTS.push(target);toast('Producto agregado');}
   save(K.p,PRODUCTS);push(()=>DB.upsertProduct(target));closeM('mProd');renderProd();
 }
 
@@ -850,6 +900,89 @@ function resetCatalog(){
   try{localStorage.setItem('crepa_seed_v',SEED_VERSION)}catch(e){}
   push(()=>DB.upsertProducts(PRODUCTS));toast('Catálogo recargado: '+PRODUCTS.length+' productos');go('prod');
 }
+
+/* ===== CATEGORÍAS ===== */
+let catQ='',editCat=null;
+function renderCats(){
+  let list=CATEGORIES.slice().sort((a,b)=>a.ord-b.ord);
+  if(catQ) list=list.filter(c=>c.name.toLowerCase().includes(catQ));
+  const el=document.getElementById('catTable');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="big">📂</div>No hay categorías.</div>';return;}
+  el.innerHTML=`<table class="tbl"><thead><tr><th>Categoría</th><th>Productos</th><th>Orden</th><th style="width:180px"></th></tr></thead><tbody>${
+    list.map(c=>{
+      const count=PRODUCTS.filter(p=>p.cat===c.name).length;
+      return `<tr><td data-l="Categoría"><b>${esc(c.name)}</b></td>
+        <td data-l="Productos">${count}</td><td data-l="Orden">${c.ord}</td>
+        <td class="noheader" style="text-align:right">
+          <button class="btn btn-line btn-sm" onclick="openCatModal('${c.id}')">Editar</button>
+          ${count===0?`<button class="btn btn-danger btn-sm" onclick="delCat('${c.id}')">Eliminar</button>`:''}</td></tr>`;
+    }).join('')}</tbody></table>`;
+}
+document.getElementById('catSearch').oninput=e=>{catQ=e.target.value.toLowerCase().trim();renderCats();};
+function openCatModal(id){
+  editCat=id?CATEGORIES.find(c=>c.id===id):null;
+  document.getElementById('mctTitle').textContent=editCat?'Editar categoría':'Nueva categoría';
+  document.getElementById('fctName').value=editCat?editCat.name:'';
+  openM('mCat2');
+}
+function saveCat(){
+  const name=document.getElementById('fctName').value.trim();
+  if(!name){toast('El nombre es obligatorio');return;}
+  const dup=CATEGORIES.find(c=>c.name.toLowerCase()===name.toLowerCase()&&c!==editCat);
+  if(dup){toast('Ya existe esa categoría');return;}
+  if(editCat){
+    const old=editCat.name; editCat.name=name;
+    PRODUCTS.filter(p=>p.cat===old).forEach(p=>{p.cat=name;});
+    save(K.p,PRODUCTS); push(()=>DB.upsertProducts(PRODUCTS.filter(p=>p.cat===name)));
+    toast('Categoría renombrada');
+  }else{
+    const id=name.toLowerCase().replace(/[^a-z0-9áéíóúñü]+/g,'-').replace(/-+$/,'');
+    CATEGORIES.push({id,name,ord:CATEGORIES.length+1});
+    toast('Categoría creada');
+  }
+  saveCats();
+  if(DB.online) supa.from('categories').upsert(CATEGORIES.map(c=>({id:c.id,name:c.name,ord:c.ord}))).catch(e=>console.warn(e));
+  closeM('mCat2'); renderCats();
+}
+function delCat(id){
+  const c=CATEGORIES.find(x=>x.id===id); if(!c)return;
+  if(PRODUCTS.some(p=>p.cat===c.name)){toast('No se puede: tiene productos');return;}
+  if(!confirm('¿Eliminar "'+c.name+'"?'))return;
+  CATEGORIES=CATEGORIES.filter(x=>x.id!==id); saveCats();
+  if(DB.online) supa.from('categories').delete().eq('id',id).catch(e=>console.warn(e));
+  renderCats(); toast('Eliminada');
+}
+function catOptions(sel){
+  return '<option value="">— Seleccionar —</option>'+
+    CATEGORIES.sort((a,b)=>a.ord-b.ord).map(c=>
+      `<option value="${esc(c.name)}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`
+    ).join('')+'<option value="__new__">+ Crear nueva…</option>';
+}
+
+/* ===== UPLOAD DE IMAGEN ===== */
+function previewImg(input){
+  const file=input.files[0]; if(!file)return;
+  _pendingFile=file;
+  document.getElementById('fpPrevImg').src=URL.createObjectURL(file);
+  document.getElementById('fpPreview').style.display='block';
+  document.getElementById('fpImg').value='';
+  document.getElementById('fpImg').placeholder='(se usará la foto subida)';
+}
+async function uploadImage(file,pid){
+  if(!DB.online){toast('Subir fotos requiere Supabase');return null;}
+  const st=document.getElementById('fpUploadStatus');
+  st.style.display='block'; st.textContent='Subiendo imagen…';
+  try{
+    const ext=file.name.split('.').pop().toLowerCase();
+    const path=pid+'.'+ext;
+    const {error}=await supa.storage.from('products').upload(path,file,{upsert:true,contentType:file.type});
+    if(error) throw error;
+    const {data}=supa.storage.from('products').getPublicUrl(path);
+    st.textContent='✓ Subida'; setTimeout(()=>{st.style.display='none';},2000);
+    return data.publicUrl;
+  }catch(e){ st.textContent='⚠ '+e.message; return null; }
+}
+
 function exportCSV(which){
   let rows,name;
   if(which==='productos'){
