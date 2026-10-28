@@ -125,9 +125,9 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
   font-weight:700;font-size:.86rem;white-space:nowrap;color:var(--ink-soft);transition:.14s}
 .chip.on{background:var(--gold);border-color:transparent;color:var(--espresso)}
 .tbl{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line)}
-.tbl th{text-align:left;padding:13px 15px;background:var(--cream-2);font-size:.78rem;font-weight:800;
+.tbl th{text-align:left;padding:8px 10px;background:var(--cream-2);font-size:.78rem;font-weight:800;
   text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft)}
-.tbl td{padding:13px 15px;border-top:1px solid var(--line);font-weight:600;vertical-align:middle}
+.tbl td{padding:8px 10px;border-top:1px solid var(--line);font-weight:600;vertical-align:middle}
 .tbl tr:hover td{background:#fffaf0}
 .tbl .thumb{width:52px;height:52px;border-radius:12px;object-fit:cover;background:var(--cream-2)}
 .pill{display:inline-block;padding:4px 11px;border-radius:100px;font-size:.74rem;font-weight:800;letter-spacing:.02em}
@@ -135,6 +135,8 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
 .pill.promo{background:#fdecef;color:#a4485a}
 .pill.temporada{background:#fff2dd;color:#8a6118}
 .pill.off{background:#f0eae0;color:#7a6a5b}
+.pill.especial{background:#e8e0f8;color:#6b46a3}
+.pill.agotado{background:#e0e0e0;color:#666}
 .pill.nop{background:#fdecec;color:var(--danger)}
 .pill.card{background:var(--gold);color:var(--espresso)}
 .empty{text-align:center;padding:48px 20px;color:var(--ink-soft);font-weight:600}
@@ -264,6 +266,7 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
       <div class="phead"><h1>Resumen</h1><p>Estado general del catálogo y la fidelización.</p></div>
       <div class="stats" id="statsBox"></div>
       <div class="panel"><h2>Pendientes por revisar</h2><p class="psub">Cosas que vale la pena resolver hoy.</p><div id="alertBox"></div></div>
+      <div class="panel"><h2>Productos de temporada</h2><p class="psub">Marca productos con etiqueta "Temporada" o "Especial" desde Productos.</p><div id="seasonBox"></div></div>
       <div class="panel"><h2>Clientes cerca del premio</h2><p class="psub">Avísales para que vuelvan — están a 1 o 2 sellos.</p><div id="nearBox"></div></div>
     </section>
 
@@ -354,7 +357,7 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
   <div class="mrow">
     <div class="field"><label>Etiqueta especial</label><select id="fpTag">
       <option value="">Ninguna</option><option value="nuevo">Nuevo</option><option value="promo">Promo</option>
-      <option value="temporada">Temporada</option><option value="favorito">Favorito</option></select></div>
+      <option value="temporada">Temporada</option><option value="favorito">Favorito</option><option value="especial">Especial</option><option value="agotado">Agotado</option></select></div>
     <div class="field"><label>Estado</label><select id="fpActive"><option value="1">Visible en el menú</option><option value="0">Oculto</option></select></div>
   </div>
   <div class="field"><label>Imagen del producto</label>
@@ -369,7 +372,7 @@ main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1240px}
     <div id="fpUploadStatus" style="display:none;margin-top:6px;font-weight:700;font-size:.84rem;color:var(--gold-deep)"></div>
   </div>
   <div class="mfoot"><button class="btn btn-line" onclick="closeM('mProd')">Cancelar</button>
-    <button class="btn btn-gold" onclick="saveProd()">Guardar</button></div>
+    <button class="btn btn-gold" id="btnSaveProd" onclick="saveProd()">Guardar</button></div>
 </div></div>
 
 <div class="modal" id="mCli"><div class="mbox">
@@ -547,13 +550,14 @@ async function doLogin(){
   const btn=document.getElementById('lbtn');
   const u=document.getElementById('lu').value.trim(), p=document.getElementById('lp').value.trim();
   let ok=false;
+  // 1) Intentar Supabase Auth si está conectado
   if(DB.online){
     btn.textContent='Entrando…';btn.disabled=true;
     try{ ok=await DB.signIn(u.includes('@')?u:ADMIN_EMAIL,p); }catch(e){ ok=false; }
     btn.textContent='Ingresar';btn.disabled=false;
-  }else{
-    ok=(u===ADMIN_USER&&p===ADMIN_PASS);
   }
+  // 2) Si Supabase falló o no está conectado, aceptar credenciales locales
+  if(!ok) ok=(u===ADMIN_USER&&p===ADMIN_PASS);
   if(!ok){const e=document.getElementById('lerr');e.classList.remove('show');void e.offsetWidth;e.classList.add('show');return;}
   sessionStorage.setItem(K.s,'1');
   document.getElementById('login').classList.add('hide');
@@ -638,35 +642,59 @@ function renderDash(){
   document.getElementById('nearBox').innerHTML = near.length
     ? near.map(c=>`<div class="alert warn"><span class="ai">⭐</span><div><b>${esc(c.name)}</b> — ${c.stamps}/${CFG.stamps} sellos, le falta${CFG.stamps-c.stamps>1?'n':''} ${CFG.stamps-c.stamps}.</div><a class="btn btn-sm btn-line" style="margin-left:auto" href="https://wa.me/57${c.phone}" target="_blank" rel="noopener">WhatsApp</a></div>`).join('')
     : `<div class="empty" style="padding:24px"><div class="big">⭐</div>Ningún cliente está cerca del premio todavía.</div>`;
+  const seasonal=PRODUCTS.filter(p=>p.active&&(p.tag==='temporada'||p.tag==='especial'));
+  document.getElementById('seasonBox').innerHTML=seasonal.length
+    ?seasonal.map(z=>'<div class="alert warn"><span class="ai">'+(z.tag==='temporada'?'\u{1F384}':'\u{2B50}')+'</span><div><b>'+esc(z.name)+'</b> \u{2014} '+esc(z.cat)+' <span class="pill '+esc(z.tag)+'">'+esc(z.tag)+'</span></div><button onclick="go(\'prod\')" style="margin-left:auto;font-weight:800;font-size:.84rem;text-decoration:underline">Ver</button></div>').join('')
+    :'<div class="empty" style="padding:16px">Ninguno marcado. Edita un producto y ponle etiqueta Temporada o Especial.</div>';
   const b=document.querySelector('[data-bdg="cli"]');
   if(b){b.style.display=ready.length?'inline-block':'none';b.textContent=ready.length;}
 }
 
 /* ===== PRODUCTOS ===== */
 let pFilter='Todos', pQuery='';
+let pView='visible';
 function renderProd(){
-  const cats=['Todos',...new Set(PRODUCTS.map(p=>p.cat))];
-  document.getElementById('pCats').innerHTML=cats.map(c=>`<button class="chip${c===pFilter?' on':''}" data-pc="${esc(c)}">${esc(c)}</button>`).join('');
+  const cats=['Todos',...CATEGORIES.sort((a,b)=>a.ord-b.ord).map(c=>c.name)];
+  document.getElementById('pCats').innerHTML=
+    `<button class="chip${pView==='visible'?' on':''}" data-pv="visible">Visibles</button>`+
+    `<button class="chip${pView==='ocultos'?' on':''}" data-pv="ocultos">Ocultos</button>`+
+    `<span style="width:1px;height:24px;background:var(--line);margin:0 4px"></span>`+
+    cats.map(c=>`<button class="chip${c===pFilter?' on':''}" data-pc="${esc(c)}">${esc(c)}</button>`).join('');
   document.querySelectorAll('[data-pc]').forEach(b=>b.onclick=()=>{pFilter=b.dataset.pc;renderProd();});
-  
-  let list=PRODUCTS.filter(p=>(pFilter==='Todos'||p.cat===pFilter)&&
+  document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{pView=b.dataset.pv;renderProd();});
+
+  const isHidden=pView==='ocultos';
+  let list=PRODUCTS.filter(p=>
+    (isHidden?p.active===false:p.active!==false)&&
+    (pFilter==='Todos'||p.cat===pFilter)&&
     (!pQuery||p.name.toLowerCase().includes(pQuery)||p.cat.toLowerCase().includes(pQuery)));
   const el=document.getElementById('pTable');
-  if(!list.length){el.innerHTML=`<div class="empty"><div class="big">🔍</div>No hay productos que coincidan.</div>`;return;}
-  el.innerHTML=`<table class="tbl"><thead><tr><th style="width:70px"></th><th>Producto</th><th>Categoría</th><th>Precio</th><th>Estado</th><th style="width:150px"></th></tr></thead><tbody>${
+  if(!list.length){
+    el.innerHTML=isHidden
+      ?`<div class="empty"><div class="big">\u{1F441}\u{FE0F}</div>No hay productos ocultos.</div>`
+      :`<div class="empty"><div class="big">\u{1F50D}</div>No hay productos que coincidan.</div>`;
+    return;
+  }
+  el.innerHTML=`<table class="tbl"><thead><tr><th style="width:46px"></th><th>Producto</th><th>Cat.</th><th>Precio</th><th style="width:210px"></th></tr></thead><tbody>${
     list.map(p=>`<tr>
-      <td class="noheader"><img class="thumb" src="${imgUrl(p.img)||PH}" onerror="this.src='${PH}'" alt=""></td>
-      <td data-l="Producto"><b>${esc(p.name)}</b>${p.tag?` <span class="pill ${esc(p.tag)}">${esc(p.tag)}</span>`:''}
-        <div style="font-size:.82rem;color:var(--ink-soft);font-weight:600">${esc((p.desc||'').slice(0,70))}${(p.desc||'').length>70?'…':''}</div></td>
-      <td data-l="Categoría">${esc(p.cat)}</td>
-      <td data-l="Precio">${p.price?`<b>${money(p.price)}</b>`:`<span class="pill nop">Sin precio</span>`}</td>
-      <td data-l="Estado">${p.active?'<span class="pill nuevo">Visible</span>':'<span class="pill off">Oculto</span>'}</td>
+      <td class="noheader"><img class="thumb" style="width:40px;height:40px;border-radius:8px" src="${imgUrl(p.img)||PH}" onerror="this.src='${PH}'" alt=""></td>
+      <td data-l="Producto"><b style="font-size:.9rem">${esc(p.name)}</b>${p.tag?` <span class="pill ${esc(p.tag)}">${esc(p.tag)}</span>`:''}</td>
+      <td data-l="Cat." style="font-size:.84rem">${esc(p.cat)}</td>
+      <td data-l="Precio">${p.price?`<b>${money(p.price)}</b>`:`<span class="pill nop">\u{2014}</span>`}</td>
       <td class="noheader" style="text-align:right;white-space:nowrap">
         <button class="btn btn-line btn-sm" onclick="openProd('${p.id}')">Editar</button>
         <button class="btn btn-line btn-sm" onclick="togP('${p.id}')">${p.active?'Ocultar':'Mostrar'}</button>
+        ${isHidden?`<button class="btn btn-danger btn-sm" onclick="delProd('${p.id}')">Eliminar</button>`:''}
       </td></tr>`).join('')}</tbody></table>`;
 }
 document.getElementById('pSearch').oninput=e=>{pQuery=e.target.value.toLowerCase().trim();renderProd();};
+function delProd(id){
+  const p=PRODUCTS.find(x=>x.id===id);if(!p)return;
+  if(!confirm('\u00bfEliminar "'+p.name+'" definitivamente?'))return;
+  PRODUCTS=PRODUCTS.filter(x=>x.id!==id);save(K.p,PRODUCTS);
+  if(DB.online)supa.from('products').delete().eq('id',id).catch(e=>console.warn(e));
+  renderProd();toast('Producto eliminado');
+}
 function togP(id){const p=PRODUCTS.find(x=>x.id===id);p.active=!p.active;save(K.p,PRODUCTS);push(()=>DB.upsertProduct(p));renderProd();toast(p.active?'Producto visible en el menú':'Producto oculto del menú');}
 let editP=null;
 function openProd(id){
@@ -689,6 +717,9 @@ function openProd(id){
   openM('mProd');
 }
 async function saveProd(){
+  const _btn=document.getElementById('btnSaveProd');
+  if(_btn.disabled)return; _btn.disabled=true;_btn.textContent='Guardando…';
+  try{
   const name=document.getElementById('fpName').value.trim();
   const cat=document.getElementById('fpCat').value.trim();
   if(!name||!cat||cat==='__new__'){toast('Nombre y categoría son obligatorios');return;}
@@ -704,6 +735,7 @@ async function saveProd(){
   if(editP){Object.assign(editP,o);target=editP;toast('Producto actualizado');}
   else{target={id:pid,...o};PRODUCTS.push(target);toast('Producto agregado');}
   save(K.p,PRODUCTS);push(()=>DB.upsertProduct(target));closeM('mProd');renderProd();
+  }finally{_btn.disabled=false;_btn.textContent='Guardar';}
 }
 
 /* ===== CLIENTES ===== */
@@ -943,7 +975,7 @@ function saveCat(){
   saveCats();
   if(DB.online) supa.from('categories').upsert(CATEGORIES.map(c=>({id:c.id,name:c.name,ord:c.ord}))).catch(e=>console.warn(e));
   closeM('mCat2');
-  // Si el modal de producto está abierto, refrescar el select y seleccionar la nueva categoría
+  // Refrescar el select del producto si está abierto
   const prodModal=document.getElementById('mProd');
   if(prodModal&&prodModal.classList.contains('on')){
     const sel=document.getElementById('fpCat');
@@ -951,6 +983,8 @@ function saveCat(){
     sel.value=name;
   }
   renderCats();
+  // Refrescar filtros de productos también
+  if(cur==='prod') renderProd();
 }
 function delCat(id){
   const c=CATEGORIES.find(x=>x.id===id); if(!c)return;
